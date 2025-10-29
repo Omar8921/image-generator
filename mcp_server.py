@@ -20,7 +20,7 @@ def generate_image(prompt: str, size: str = "1024x1024") -> dict:
     data = res.data[0]
     b64 = getattr(data, "b64_json", None)
     url = getattr(data, "url", None)
-
+    
     if b64:
         name = f"{uuid.uuid4().hex}.png"
         os.makedirs("images", exist_ok=True)
