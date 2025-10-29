@@ -9,7 +9,6 @@ load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 app = FastAPI()
-app.mount("/images", StaticFiles(directory="images"), name="images")
 
 class ImageReq(BaseModel):
     prompt: str
