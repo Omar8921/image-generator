@@ -1,8 +1,7 @@
-from fastapi import FastAPI, Request
-from fastapi.staticfiles import StaticFiles
+from fastapi import FastAPI
 from pydantic import BaseModel
 from openai import OpenAI
-import os, base64, uuid
+import os
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -15,23 +14,10 @@ class ImageReq(BaseModel):
     size: str = "1024x1024"
 
 @app.post("/generate_image")
-def gen(req: ImageReq, request: Request):
+def gen(req: ImageReq):
     try:
         res = client.images.generate(model="gpt-image-1", prompt=req.prompt, size=req.size)
-        data = res.data[0]
-        b64 = getattr(data, "b64_json", None)
-        url = getattr(data, "url", None)
-
-        if b64:
-            name = f"{uuid.uuid4().hex}.png"
-            os.makedirs("images", exist_ok=True)
-            path = os.path.join("images", name)
-            with open(path, "wb") as f:
-                f.write(base64.b64decode(b64))
-
-            base_url = str(request.base_url).rstrip("/")
-            url = f"{base_url}/images/{name}"
-
+        url = res.data[0].url
         return {"image_url": url, "prompt": req.prompt}
     except Exception as e:
         return {"error": str(e)}
