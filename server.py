@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from openai import OpenAI
@@ -15,7 +15,7 @@ class ImageReq(BaseModel):
     size: str = "1024x1024"
 
 @app.post("/generate_image")
-def gen(req: ImageReq):
+def gen(req: ImageReq, request: Request):
     try:
         res = client.images.generate(model="gpt-image-1", prompt=req.prompt, size=req.size)
         data = res.data[0]
@@ -24,7 +24,13 @@ def gen(req: ImageReq):
 
         if b64:
             name = f"{uuid.uuid4().hex}.png"
-            url = f"https://04357e090d1a.ngrok-free.app/images/{name}"
+            os.makedirs("images", exist_ok=True)
+            path = os.path.join("images", name)
+            with open(path, "wb") as f:
+                f.write(base64.b64decode(b64))
+
+            base_url = str(request.base_url).rstrip("/")
+            url = f"{base_url}/images/{name}"
 
         return {"image_url": url, "prompt": req.prompt}
     except Exception as e:
