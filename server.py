@@ -6,13 +6,22 @@ import os, base64, uuid
 from dotenv import load_dotenv
 
 load_dotenv()
+
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+PUBLIC_URL = os.getenv("EXTERNAL_BASE_URL")
 
 app = FastAPI()
+
+os.makedirs("images", exist_ok=True)
+app.mount("/images", StaticFiles(directory="images"), name="images")
 
 class ImageReq(BaseModel):
     prompt: str
     size: str = "1024x1024"
+
+@app.get("/")
+def home():
+    return {"status": "OK", "message": "Image generator is live."}
 
 @app.post("/generate_image")
 def gen(req: ImageReq, request: Request):
@@ -24,12 +33,11 @@ def gen(req: ImageReq, request: Request):
 
         if b64:
             name = f"{uuid.uuid4().hex}.png"
-            os.makedirs("images", exist_ok=True)
             path = os.path.join("images", name)
             with open(path, "wb") as f:
                 f.write(base64.b64decode(b64))
 
-            base_url = str(request.base_url).rstrip("/")
+            base_url = (PUBLIC_URL or str(request.base_url)).rstrip("/")
             url = f"{base_url}/images/{name}"
 
         return {"image_url": url, "prompt": req.prompt}
