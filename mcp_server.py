@@ -2,6 +2,9 @@ from fastapi import FastAPI
 from mcp.server.fastmcp import FastMCP
 from openai import OpenAI
 import os, base64, uuid
+from dotenv import load_dotenv
+
+load_dotenv()
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 PUBLIC_URL = os.getenv("EXTERNAL_BASE_URL", "https://image-generator-bpo3.onrender.com")
@@ -29,4 +32,4 @@ def generate_image(prompt: str, size: str = "1024x1024") -> dict:
     return {"image_url": url, "prompt": prompt}
 
 app = FastAPI(title="Image Generator MCP Server")
-mcp.register_to(app)
+app.mount("/mcp", mcp.streamable_http_app)
