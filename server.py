@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from openai import OpenAI
 import os, base64, uuid
@@ -43,3 +44,22 @@ def gen(req: ImageReq, request: Request):
         return {"image_url": url, "prompt": req.prompt}
     except Exception as e:
         return {"error": str(e)}
+
+@app.get("/.well-known/ai-plugin.json")
+def plugin_manifest():
+    """
+    Simple MCP manifest so Agent Builder can discover /generate_image.
+    """
+    return JSONResponse({
+        "schema_version": "v1",
+        "name_for_human": "Image Generator",
+        "name_for_model": "image_generator",
+        "description_for_model": "Generate images from text prompts.",
+        "api": {
+            "type": "openapi",
+            "url": f"{os.getenv('EXTERNAL_BASE_URL', 'https://image-generator-bpo3.onrender.com')}/openapi.json"
+        },
+        "auth": { "type": "none" },
+        "contact_email": "you@example.com",
+        "legal_info_url": "https://example.com"
+    })
