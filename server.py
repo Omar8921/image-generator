@@ -9,8 +9,6 @@ load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 app = FastAPI()
-app.mount("/images", StaticFiles(directory="images"), name="images")
-app.mount("/.well-known", StaticFiles(directory=".well-known"), name="well-known")
 
 class ImageReq(BaseModel):
     prompt: str
@@ -25,11 +23,7 @@ def gen(req: ImageReq):
         url = getattr(data, "url", None)
 
         if b64:
-            os.makedirs("images", exist_ok=True)
             name = f"{uuid.uuid4().hex}.png"
-            path = os.path.join("images", name)
-            with open(path, "wb") as f:
-                f.write(base64.b64decode(b64))
             url = f"https://04357e090d1a.ngrok-free.app/images/{name}"
 
         return {"image_url": url, "prompt": req.prompt}
