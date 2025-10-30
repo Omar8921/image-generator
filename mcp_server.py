@@ -13,25 +13,6 @@ PUBLIC_URL = os.getenv("EXTERNAL_BASE_URL", "https://image-generator-bpo3.onrend
 # --- Initialize MCP ---
 mcp = FastMCP("image_generator")
 
-@mcp.get("/mcp/tools")
-def get_tools():
-    return {
-        "tools": [
-            {
-                "name": "generate_image",
-                "description": "Generate an image from a text prompt.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "prompt": {"type": "string"},
-                        "size": {"type": "string", "default": "1024x1024"},
-                    },
-                    "required": ["prompt"]
-                }
-            }
-        ]
-    }
-
 # ✅ Correct: use the built-in MCP tool registration method
 @mcp.tool()
 def generate_image(prompt: str, size: str = "1024x1024") -> dict:
@@ -64,7 +45,8 @@ app.add_middleware(
 )
 
 # ✅ Mount the MCP app
-app.mount("/mcp", mcp.streamable_http_app())
+app.mount("/mcp", mcp.streamable_http_app)
+
 
 # ✅ (Optional sanity check route)
 @app.get("/")
