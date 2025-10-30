@@ -1,24 +1,28 @@
 from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from mcp.server.fastmcp import FastMCP
 from openai import OpenAI
 import os, base64, uuid, inspect
 from dotenv import load_dotenv
 
-# --- Load env ---
+# --- Load environment ---
 load_dotenv()
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 PUBLIC_URL = os.getenv("EXTERNAL_BASE_URL", "https://image-generator-bpo3.onrender.com")
 
+# --- Initialize MCP server ---
 mcp = FastMCP("image_generator")
 
 REGISTERED_TOOLS = {}
 
 def register_tool(func):
+    """Decorator to register tools for MCP discovery."""
     REGISTERED_TOOLS[func.__name__] = func
     return mcp.tool()(func)
 
+# --- Tool definition ---
 @register_tool
 def generate_image(prompt: str, size: str = "1024x1024") -> dict:
     """Generate a photorealistic image and return its live URL."""
@@ -27,6 +31,7 @@ def generate_image(prompt: str, size: str = "1024x1024") -> dict:
     b64 = getattr(data, "b64_json", None)
     url = getattr(data, "url", None)
 
+    # Save locally if only base64 is returned
     if b64:
         name = f"{uuid.uuid4().hex}.png"
         os.makedirs("images", exist_ok=True)
@@ -38,7 +43,7 @@ def generate_image(prompt: str, size: str = "1024x1024") -> dict:
     return {"image_url": url, "prompt": prompt}
 
 
-# --- App setup ---
+# --- FastAPI app setup ---
 app = FastAPI(title="Image Generator MCP Server")
 app.add_middleware(
     CORSMiddleware,
@@ -51,6 +56,8 @@ app.add_middleware(
 def root():
     return {"status": "ok", "message": "MCP server running"}
 
+
+# --- MCP Routes ---
 router = APIRouter()
 
 @router.get("/tools")
@@ -65,10 +72,10 @@ def list_tools():
                     "type": "object",
                     "properties": {
                         "prompt": {"type": "string"},
-                        "size": {"type": "string", "default": "1024x1024"}
+                        "size": {"type": "string", "default": "1024x1024"},
                     },
-                    "required": ["prompt"]
-                }
+                    "required": ["prompt"],
+                },
             }
             for name, func in REGISTERED_TOOLS.items()
         ]
@@ -76,6 +83,7 @@ def list_tools():
 
 @router.post("/call/{tool_name}")
 async def call_tool(tool_name: str, body: dict):
+    """Call a registered MCP tool."""
     tool = REGISTERED_TOOLS.get(tool_name)
     if not tool:
         return {"error": f"Tool '{tool_name}' not found"}
@@ -85,6 +93,20 @@ async def call_tool(tool_name: str, body: dict):
     else:
         return tool(**body)
 
+
+# --- Required for OpenAI Agent Builder integration ---
+@app.get("/.well-known/mcp.json")
+def mcp_manifest():
+    """Expose MCP metadata for OpenAI Agent Builder discovery."""
+    return JSONResponse({
+        "mcp_server": {
+            "version": "1.0",
+            "tools_endpoint": f"{PUBLIC_URL.rstrip('/')}/mcp/tools"
+        }
+    })
+
+
+# --- Register router ---
 app.include_router(router, prefix="/mcp")
 
 print("✅ Routes:", [r.path for r in app.router.routes])
