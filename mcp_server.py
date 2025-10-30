@@ -94,17 +94,15 @@ async def call_tool(tool_name: str, body: dict):
         return tool(**body)
 
 
-# --- Required for OpenAI Agent Builder integration ---
 @app.get("/.well-known/mcp.json")
 def mcp_manifest():
-    """Expose MCP metadata for OpenAI Agent Builder discovery."""
     return JSONResponse({
-        "mcp_server": {
-            "version": "1.0",
-            "tools_endpoint": f"{PUBLIC_URL.rstrip('/')}/mcp/tools"
+        "version": "1.0",
+        "server_url": f"{PUBLIC_URL.rstrip('/')}",
+        "tools": {
+            "endpoint": f"{PUBLIC_URL.rstrip('/')}/mcp/tools"
         }
     })
-
 
 # --- Register router ---
 app.include_router(router, prefix="/mcp")
