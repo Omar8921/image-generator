@@ -45,7 +45,7 @@ app.add_middleware(
 )
 
 # ✅ Mount the MCP app
-app.mount("/mcp", mcp.streamable_http_app)
+app.mount("/mcp", mcp.streamable_http_app())
 
 
 # ✅ (Optional sanity check route)
