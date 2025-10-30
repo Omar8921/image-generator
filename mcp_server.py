@@ -109,36 +109,24 @@
 
 # print("✅ Routes:", [r.path for r in app.router.routes])
 
-# server.py
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from mcp.server.fastmcp import FastMCP
+from pydantic import BaseModel
 from openai import OpenAI
 import os
-from dotenv import load_dotenv
 
-load_dotenv()
-
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 app = FastAPI()
-mcp = FastMCP("image_generator")
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"]
-)
+class ImageReq(BaseModel):
+    prompt: str
+    size: str = "1024x1024"
 
-@mcp.tool()
-def generate_image(prompt: str, size: str = "1024x1024") -> dict:
+@app.post("/generate_image")
+def generate_image(req: ImageReq):
     """Generate a photorealistic image and return its live URL."""
-    res = client.images.generate(model="gpt-image-1", prompt=prompt, size=size)
-    return {"image_url": res.data[0].url, "prompt": prompt}
-
-# Mount MCP routes
-app.mount("/mcp", mcp.app)
+    res = client.images.generate(model="gpt-image-1", prompt=req.prompt, size=req.size)
+    return {"image_url": res.data[0].url, "prompt": req.prompt}
 
 @app.get("/")
 def home():
-    return {"message": "MCP server is running"}
+    return {"status": "FastAPI server running"}
