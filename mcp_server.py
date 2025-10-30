@@ -2,7 +2,7 @@ from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from mcp.server.fastmcp import FastMCP
 from openai import OpenAI
-import os, base64, uuid
+import os, base64, uuid, inspect
 from dotenv import load_dotenv
 
 # --- Load env ---
@@ -61,7 +61,7 @@ def list_tools():
             {
                 "name": name,
                 "description": func.__doc__ or "",
-                "input_schema": {
+                "parameters": {
                     "type": "object",
                     "properties": {
                         "prompt": {"type": "string"},
@@ -79,7 +79,11 @@ async def call_tool(tool_name: str, body: dict):
     tool = REGISTERED_TOOLS.get(tool_name)
     if not tool:
         return {"error": f"Tool '{tool_name}' not found"}
-    return await tool(**body) if callable(tool) else {"error": "Invalid tool"}
+
+    if inspect.iscoroutinefunction(tool):
+        return await tool(**body)
+    else:
+        return tool(**body)
 
 app.include_router(router, prefix="/mcp")
 
