@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from mcp.server.fastmcp import FastMCP
 from openai import OpenAI
@@ -10,11 +10,16 @@ load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 PUBLIC_URL = os.getenv("EXTERNAL_BASE_URL", "https://image-generator-bpo3.onrender.com")
 
-# --- Initialize MCP ---
 mcp = FastMCP("image_generator")
 
-# ✅ Correct: use the built-in MCP tool registration method
-@mcp.tool()
+REGISTERED_TOOLS = {}
+
+def register_tool(func):
+    """Decorator to register MCP tools manually (for compatibility)."""
+    REGISTERED_TOOLS[func.__name__] = func
+    return mcp.tool()(func)
+
+@register_tool
 def generate_image(prompt: str, size: str = "1024x1024") -> dict:
     """Generate a photorealistic image and return its live URL."""
     res = client.images.generate(model="gpt-image-1", prompt=prompt, size=size)
@@ -33,10 +38,8 @@ def generate_image(prompt: str, size: str = "1024x1024") -> dict:
     return {"image_url": url, "prompt": prompt}
 
 
-# ✅ FastAPI setup
 app = FastAPI(title="Image Generator MCP Server")
 
-# ✅ Add CORS so Agent Builder can call /mcp/tools
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -44,11 +47,42 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ✅ Mount the MCP app
-app.mount("/mcp", mcp.streamable_http_app())
-
-
-# ✅ (Optional sanity check route)
 @app.get("/")
 def root():
     return {"status": "ok", "message": "MCP server running"}
+
+
+router = APIRouter()
+
+@router.get("/tools")
+def list_tools():
+    """Return the list of registered MCP tools."""
+    return {
+        "tools": [
+            {
+                "name": name,
+                "description": func.__doc__ or "",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "prompt": {"type": "string"},
+                        "size": {"type": "string", "default": "1024x1024"},
+                    },
+                    "required": ["prompt"],
+                },
+            }
+            for name, func in REGISTERED_TOOLS.items()
+        ]
+    }
+
+@router.post("/call/{tool_name}")
+async def call_tool(tool_name: str, body: dict):
+    """Invoke a specific tool by name."""
+    tool = REGISTERED_TOOLS.get(tool_name)
+    if not tool:
+        return {"error": f"Tool '{tool_name}' not found"}
+    return await tool(**body) if callable(tool) else {"error": "Invalid tool"}
+
+app.include_router(router, prefix="/mcp")
+
+print("✅ Routes:", [r.path for r in app.router.routes])
