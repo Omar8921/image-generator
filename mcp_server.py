@@ -5,6 +5,7 @@ from openai import OpenAI
 import os, base64, uuid
 from dotenv import load_dotenv
 
+# --- Load env ---
 load_dotenv()
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -15,7 +16,6 @@ mcp = FastMCP("image_generator")
 REGISTERED_TOOLS = {}
 
 def register_tool(func):
-    """Decorator to register MCP tools manually (for compatibility)."""
     REGISTERED_TOOLS[func.__name__] = func
     return mcp.tool()(func)
 
@@ -38,8 +38,8 @@ def generate_image(prompt: str, size: str = "1024x1024") -> dict:
     return {"image_url": url, "prompt": prompt}
 
 
+# --- App setup ---
 app = FastAPI(title="Image Generator MCP Server")
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -51,25 +51,24 @@ app.add_middleware(
 def root():
     return {"status": "ok", "message": "MCP server running"}
 
-
 router = APIRouter()
 
 @router.get("/tools")
 def list_tools():
-    """Return the list of registered MCP tools."""
+    """Return tools in the official MCP schema format."""
     return {
         "tools": [
             {
                 "name": name,
                 "description": func.__doc__ or "",
-                "parameters": {
+                "input_schema": {
                     "type": "object",
                     "properties": {
                         "prompt": {"type": "string"},
-                        "size": {"type": "string", "default": "1024x1024"},
+                        "size": {"type": "string", "default": "1024x1024"}
                     },
-                    "required": ["prompt"],
-                },
+                    "required": ["prompt"]
+                }
             }
             for name, func in REGISTERED_TOOLS.items()
         ]
@@ -77,7 +76,6 @@ def list_tools():
 
 @router.post("/call/{tool_name}")
 async def call_tool(tool_name: str, body: dict):
-    """Invoke a specific tool by name."""
     tool = REGISTERED_TOOLS.get(tool_name)
     if not tool:
         return {"error": f"Tool '{tool_name}' not found"}
