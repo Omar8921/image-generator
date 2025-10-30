@@ -110,23 +110,55 @@
 # print("✅ Routes:", [r.path for r in app.router.routes])
 
 from fastapi import FastAPI
-from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
 from openai import OpenAI
 import os
+from dotenv import load_dotenv
+import json
 
-app = FastAPI()
+load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-class ImageReq(BaseModel):
-    prompt: str
-    size: str = "1024x1024"
+app = FastAPI(title="Image Generator MCP Server")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
 
+# --- tool definition ---
 @app.post("/generate_image")
-def generate_image(req: ImageReq):
-    """Generate a photorealistic image and return its live URL."""
-    res = client.images.generate(model="gpt-image-1", prompt=req.prompt, size=req.size)
-    return {"image_url": res.data[0].url, "prompt": req.prompt}
+def generate_image(prompt: str, size: str = "1024x1024"):
+    res = client.images.generate(model="gpt-image-1", prompt=prompt, size=size)
+    return {"image_url": res.data[0].url, "prompt": prompt}
 
-@app.get("/")
-def home():
-    return {"status": "FastAPI server running"}
+# --- MCP discovery endpoints ---
+@app.get("/.well-known/mcp.json")
+def mcp_manifest():
+    return {
+        "mcp_server": {
+            "name": "image_generator",
+            "version": "1.0.0",
+            "tools_endpoint": "/mcp/tools"
+        }
+    }
+
+@app.get("/mcp/tools")
+def mcp_tools():
+    return {
+        "tools": [
+            {
+                "name": "generate_image",
+                "description": "Generate a photorealistic image using GPT-image-1.",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "prompt": {"type": "string"},
+                        "size": {"type": "string", "default": "1024x1024"}
+                    },
+                    "required": ["prompt"]
+                }
+            }
+        ]
+    }
